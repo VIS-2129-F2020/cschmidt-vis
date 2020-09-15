@@ -1,0 +1,168 @@
+---
+title: "cschmidt-vis_assignment1"
+author: "Christian Schmidt"
+date: "9/14/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1. Load data and trim it to a subsample.
+
+```{r}
+dataset<-read.csv("assignment1.csv")
+datasetedited<-read.csv(file="assignment1.csv", nrows = 250)
+```
+
+2. Load ggplot2 library. 
+
+```{r}
+library(ggplot2)
+```
+
+3. Scatterplot: Simple
+
+```{r}
+ggplot(data = datasetedited,
+          aes(x = children,
+           y = salary)) +
+         geom_point() +
+  scale_size_continuous(name = "Tract population") +
+  scale_x_continuous(name = "Number of Children",
+                     breaks = seq(0, 2, by = 1),
+                     labels = paste(seq(0, 2, by = 1), sep = "")) +
+  scale_y_continuous(name="Salary")
+
+```
+
+4. Box Plot
+
+```{r}
+catvchildren<-as.character(datasetedited$children)
+ggplot(data = datasetedited,
+          aes(x = catvchildren,
+           y = salary)) +
+         geom_boxplot() 
+
+```
+
+5. Smoothed Line Graph
+
+```{r}
+
+ggplot(data = datasetedited,
+       aes(x = weeklyhoursworked,
+           y = salary)) +
+        
+        geom_smooth(colour="red")
+
+        
+
+
+```
+
+6. Flipped Bar Chart
+
+```{r}
+
+dse<-datasetedited
+ggplot(datasetedited, aes(x=maritalstatus, y=salary, label="Yearly Salary")) + 
+  geom_bar(stat='identity', aes(fill=maritalstatus), width=.5)  +
+  
+  labs(subtitle="Normalised mileage from 'mtcars'", 
+       title= "Marital Status & Salary") + 
+  coord_flip()
+
+```
+
+7. Histogram but Fancy
+
+```{r}
+ggplot(dse, aes(x=weeklyhoursworked))+ scale_fill_brewer(palette = "Spectral")+
+  geom_histogram(aes(fill=maritalstatus), 
+                   binwidth = 5, 
+                   col="black", 
+                   size=.1) +
+  labs(title="Weekly Hours Worked w/ Consideration of Marital Status", 
+       subtitle="A Histogram") 
+```
+
+8. Viola Plat
+
+```{r}
+ggplot(dse, aes(catvchildren, weeklyhoursworked))+
+  geom_violin() + 
+  labs(title="Violin plot", 
+       subtitle="Work Relative to New Kids",
+       x="New Kids",
+       y="Hours Worked")
+```
+
+9. Nastily Uninformative Count Plot
+
+```{r}
+
+theme_set(theme_bw())
+ggplot(dse, aes(children, totalmarriages))+
+  geom_count(col="tomato3", show.legend=T) +
+  labs(
+       y="Total marriages", 
+       x="Children", 
+       title="Children Relative to Total Marriages")
+                                
+
+```
+
+10. Bubbles with Color
+
+```{r}
+ggplot(dse, aes(x=salary, y=weeklyhoursworked)) + 
+  geom_point(aes(col=children, size=totalmarriages))
+```
+
+11. Lollipop but more confusing than Useful
+
+```{r}
+ggplot(dse, aes(x=maritalstatus, y=children)) + 
+  geom_point(size=1) + 
+  geom_segment(aes(x=0,
+                   xend=maritalstatus,
+                   y=0, 
+                   yend=children)) + 
+  labs(title="Lollipop Chart", 
+       subtitle="Make Vs Avg. Mileage", 
+       caption="source: mpg") 
+
+```
+
+12. Pie Chart
+
+```{r}
+ggplot(dse, aes(x = "", fill = factor(maritalstatus))) + 
+  geom_bar(width = 1) +
+  theme(axis.line = element_blank(), 
+        plot.title = element_text(hjust=0.5)) + 
+  labs(fill="Marital Status", 
+       x=NULL, 
+       y=NULL, 
+       title="Pie Chart of Marital Status", 
+       caption="Source: Census Bureau")+
+  coord_polar(theta = "y", start=0)
+```
+
+13. Flipped Useless Smooth Histogram Line
+
+```{r}
+ ggplot(dse, aes(children))+ 
+  geom_density(aes(fill=factor(children)), alpha=0.8) + 
+    labs(title="Density plot", 
+         subtitle="",
+         caption="Source: mpg",
+         x="Amount of Children",
+         fill="Children")+
+coord_flip()
+```
+
+
