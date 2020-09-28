@@ -1,0 +1,240 @@
+---
+title: "cschmidt-vis_assignment3"
+author: "cschmidt"
+date: "9/25/2020"
+output: html_document
+---
+
+```{r, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+Load Relevant Libraries
+```{r}
+
+library(sf)
+library(dbplyr)
+library(tidyverse)
+library(ggthemes)
+library(ggspatial)
+library(units)
+library(nngeo)
+library(rgdal)
+library(rgeos, quiet=TRUE)
+```
+Upload Data
+```{r}
+nhoods<-st_read("http://bostonopendata-boston.opendata.arcgis.com/datasets/3525b0ee6e6b427f9aab5d0a1d0a1a28_0.kml?outSR={%22latestWkid%22:2249,%22wkid%22:102686}", quiet=TRUE)
+water<-st_read("http://bostonopendata-boston.opendata.arcgis.com/datasets/2b3c0fa13b1c468eb702a3645fcc6bcb_5.kml", quiet = TRUE)
+wifi<-st_read("http://bostonopendata-boston.opendata.arcgis.com/datasets/4b803745fedd4e88861967d16a1e07fb_0.kml?outSR=%7B%22latestWkid%22%3A3857%2C%22wkid%22%3A102100%7D", quiet = TRUE)
+ev<-st_read("http://bostonopendata-boston.opendata.arcgis.com/datasets/465e00f9632145a1ad645a27d27069b4_2.kml?outSR=%7B%22latestWkid%22%3A2249%2C%22wkid%22%3A102686%7D", quiet = TRUE)
+
+MA_state_plane <- "+proj=lcc +lat_1=41.71666666666667 +lat_2=42.68333333333333 +lat_0=41 +lon_0=-71.5 +x_0=200000 +y_0=750000 +ellps=GRS80 +units=m +no_defs"
+```
+Unify Projections
+```{r}
+nhoods <- nhoods %>%
+  st_transform(MA_state_plane)
+
+water <- water %>%
+  st_transform(MA_state_plane)
+
+wifi <- wifi %>%
+  st_transform(MA_state_plane)
+
+ev <- ev %>%
+  st_transform(MA_state_plane)
+```
+
+Preliminary Map
+```{r}
+ggplot(nhoods)+
+  geom_sf(fill=NA, color = "black") +
+  geom_sf(data = water, fill="lightblue", color=NA)+
+  geom_sf(data = ev, color = "darkred", size = 0.01)+
+  geom_sf(data = wifi, color = "darkgreen", size = 0.01)
+```
+Buffer Zones
+```{r}
+wifirange<-st_buffer(wifi, dist = 200) %>%
+  st_union()
+wifirange<- wifirange %>%
+  st_transform(MA_state_plane)
+
+ggplot(wifirange) +
+  geom_sf() +
+  theme_map()
+```
+Inclusion w/in Buffer Zones
+```{r}
+ev_wifi <- ev[wifirange,]
+
+ggplot(wifirange) +
+  geom_sf() +
+  geom_sf(data = ev_wifi, 
+          color = "red", 
+          size = 0.01) +
+  theme_map()
+```
+```{r}
+ev <- ev %>%
+  st_join(ev_wifi) %>%
+  mutate(in_range = !is.na(Name.y))
+n_ev_range<-sum(ev$in_range)
+n_ev_range
+n_ev<-length(ev$Name.x)
+pct_ev_range<-n_ev_range/n_ev*100
+```
+Display All Findings in Map
+```{r}
+left_side  <- st_bbox(ev)$xmin
+top_side <- st_bbox(ev)$ymax
+
+ggplot(water) +
+  geom_sf(fill = "lightblue", color = NA) +
+  geom_sf(data = ev, size = 0.01,
+          aes(color = in_range)) +
+  scale_color_manual(values = c("red", "darkred"),
+          name = "Charging Stations\nby within wifi range", 
+          labels = c("Wifi Outside 200m",
+                     "Wifi w/in 200m")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+  annotate(geom = "text", x = left_side, 
+           y = top_side, 
+           label = paste("Of the ", 
+                         prettyNum(n_ev, big.mark = ","),
+                         " charging stations in Boston\n", 
+                         prettyNum(n_ev_range, big.mark = ","),
+                         " (", 
+                         prettyNum(pct_ev_range, digits = 0),
+                         "%) are within 200\nmeters of a wifi portal.",
+                         sep = ""),
+           hjust = 0, vjust = 0, size = 3) +
+  theme_map() +
+  theme(panel.background = element_rect(fill = "cornsilk1"),
+        legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
+Points in a Polygon
+```{r}
+nhoods <- nhoods %>%
+  mutate(num_wifi = lengths(st_covers(nhoods, wifi)))
+
+ggplot(nhoods) +
+  geom_sf(color = NA, 
+          aes(fill = num_wifi)) +
+  scale_fill_viridis_c(name = "Boston neighborhoods\nby number of trees",
+                       breaks = breaks <- seq(0, 70, by = 10),
+                       labels = paste(prettyNum(breaks, big.mark = ","),
+                                      "wifi portals")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+
+  theme_map() +
+  theme(legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+
+```
+Density Map
+```{r}
+nhoods <- nhoods %>%
+  mutate(area = set_units(st_area(nhoods), km^2)) %>%
+  mutate(port_dens = as.numeric(num_wifi / area))
+
+ggplot(nhoods) +
+  geom_sf(color = NA, 
+          aes(fill = port_dens)) +
+    scale_fill_viridis_c(name = 
+                           "Boston neighborhoods\nby wifi portal density",
+                       breaks = breaks <- seq(0, 8, by = 2),
+                       labels = paste(prettyNum(breaks, big.mark = ","),
+                                      "wifi  portals per square km")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+theme_map() +
+  theme(legend.position = "right",
+    legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
+
+Closest Points
+```{r}
+ev <- ev %>%
+  mutate(wifi_dist = st_nn(ev, wifi, 
+                           returnDist = TRUE)$dist) %>%
+  mutate(wifi_dist = as.numeric(wifi_dist))
+
+avg_ev_dist <- mean(ev$wifi_dist)
+avg_ev_dist
+
+right_side <- st_bbox(wifi)$xmax
+left_side  <- st_bbox(wifi)$xmin
+top_side <- st_bbox(wifi)$ymax
+bottom_side <- st_bbox(wifi)$ymin
+
+
+ggplot(water) +
+  geom_sf(fill = "lightblue", color = NA) +
+  geom_sf(data = ev, size = 0.1,
+          aes(color = wifi_dist)) +
+  coord_sf(xlim = c(left_side, right_side), 
+           ylim = c(bottom_side, top_side), expand = FALSE) +
+  scale_color_viridis_c(name = 
+                          "Charging Stations\nby distance to a wifi portal") +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+  annotate(geom = "text", x = left_side + 300, 
+           y = top_side - 550, 
+           label = paste("On average, a Boston chargin station\nis ", 
+                         prettyNum(avg_ev_dist, digits = 3),
+                         " meters from a wifi portal.",
+                         sep = ""),
+           hjust = 0, vjust = 3, size = 3) +
+  theme_map() +
+  theme(panel.background = element_rect(fill = "cornsilk1"),
+        legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
+Overlapping Polygons
+```{r}
+nhoods <- nhoods %>%
+  mutate(num_water = lengths(st_overlaps(nhoods, water))) %>%
+  mutate(has_water = num_water > 0)
+
+n_water_nhoods <- sum(nhoods$has_water)
+
+n_water_nhoods
+
+left_side  <- st_bbox(water)$xmin
+top_side <- st_bbox(water)$ymax
+
+ggplot(water) +
+  geom_sf(fill = "lightblue", color = NA) +
+  geom_sf(data = nhoods,
+          aes(fill = has_water)) +
+  scale_fill_manual(values = c("cornsilk1", "darkseagreen1"),
+          name = "Boston Neighborhoods\nby presence of a body of water", 
+          labels = c("Neighborhood without\nan overlapping body of water",
+                     "Neighborhood with an\noverlapping body of water")) +
+  annotation_scale(location = "br") +
+  annotation_north_arrow(location = "tr",
+                         style = north_arrow_minimal()) +
+  annotate(geom = "text", x = left_side, 
+           y = top_side - 1000, 
+           label = paste(n_water_nhoods ,
+                         "of Boston's", 
+                         length(nhoods$Name),
+                         "neighborhoods contain\nor overlap with", 
+                         "a body of water."),
+           hjust = 0, vjust = 0, size = 3) +
+  theme_map() +
+  theme(panel.background = element_rect(fill = "gray"),
+        legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
+
