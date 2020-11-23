@@ -10,3 +10,52 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Raster Interpolation
+
+Load Libraries
+
+```{r, results=FALSE}
+library(tidyverse)
+library(sf)
+library(leaflet)
+library(htmltools)
+library(htmlwidgets)
+library(dplyr)
+```
+
+Read-In Tucson Parks Data
+
+```{r, results=FALSE}
+parks <- st_read("https://opendata.arcgis.com/datasets/9e166b9327ad492397ac44607b096d44_0.kml?outSR=%7B%22falseM%22%3A-100000%2C%22xyTolerance%22%3A0.0032808398950131233%2C%22mUnits%22%3A10000%2C%22zUnits%22%3A10000%2C%22latestWkid%22%3A2868%2C%22zTolerance%22%3A0.001%2C%22wkid%22%3A2868%2C%22xyUnits%22%3A3048%2C%22mTolerance%22%3A0.001%2C%22falseX%22%3A-17746700%2C%22falseY%22%3A-44067300%2C%22falseZ%22%3A-100000%7D")
+```
+
+```{r}
+parks$geometry1<-as.numeric(st_area(parks$geometry))
+parks$acres<- ((parks$geometry1) / 4046.86)
+options(scipen=999)
+```
+
+Create Interactive Map
+
+```{r}
+parks$describe <- 
+  paste(parks$Name, "<Name>", 
+               prettyNum(parks$acres, digits = 2), " acres") %>% 
+  lapply(htmltools::HTML)
+
+parks_map1 <- leaflet(parks) %>%
+  addProviderTiles(providers$Stamen.TonerLite) %>%
+  addPolygons(fillColor = "green", stroke = FALSE,
+              highlightOptions = highlightOptions(fillColor = "darkgreen", 
+                                                  fillOpacity = 1),
+              label = ~describe) %>%
+  addControl("Park Locations in Tucson", position = "topright") %>%
+  addControl('<a href="https://gisdata.tucsonaz.gov/datasets/city-of-tucson-parks-open-data',
+             position = "bottomleft")
+
+parks_map1
+```
+Save as File
+
+```{r}
+saveWidget(parks_map1, file = "parks.html")
+```
