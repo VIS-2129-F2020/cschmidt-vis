@@ -1,0 +1,12 @@
+---
+title: "cschmidt-vis_assignment6"
+author: "cschmidt"
+date: "11/23/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Raster Interpolation
